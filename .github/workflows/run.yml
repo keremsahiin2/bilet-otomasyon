@@ -1,0 +1,24 @@
+name: Bilet Otomasyon
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Python kur
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Paketleri kur
+        run: pip install -r requirements.txt
+
+      - name: Script çalıştır
+        run: python main.py
+        
