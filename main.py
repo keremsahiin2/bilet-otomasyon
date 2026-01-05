@@ -2,17 +2,23 @@ import os
 import json
 import requests
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
 from io import BytesIO
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
-# =====================
-# 1. ENV KONTROLLERİ
-# =====================
+print("🚀 Script başladı")
 
+# ===============================
+# ENV KONTROL
+# ===============================
 BUBILET_TOKEN = os.getenv("BUBILET_TOKEN")
 SHEET_ID = os.getenv("SHEET_ID")
 GOOGLE_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+
+print("🔍 ENV kontrol:")
+print("BUBILET_TOKEN var mı?", bool(BUBILET_TOKEN))
+print("SHEET_ID var mı?", bool(SHEET_ID))
+print("GOOGLE JSON var mı?", bool(GOOGLE_JSON))
 
 if not BUBILET_TOKEN:
     raise Exception("BUBILET_TOKEN yok")
@@ -23,31 +29,9 @@ if not SHEET_ID:
 if not GOOGLE_JSON:
     raise Exception("GOOGLE_SERVICE_ACCOUNT_JSON yok")
 
-print("✅ ENV değişkenleri OK")
-
-# =====================
-# 2. GOOGLE SHEETS BAĞLANTISI
-# =====================
-
-creds_dict = json.loads(GOOGLE_JSON)
-
-scopes = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
-
-credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-gc = gspread.authorize(credentials)
-
-spreadsheet = gc.open_by_key(SHEET_ID)
-worksheet = spreadsheet.sheet1
-
-print("✅ Google Sheets bağlantısı OK")
-
-# =====================
-# 3. BUBILET EXCEL İNDİR
-# =====================
-
+# ===============================
+# BUBILET EXCEL İNDİR
+# ===============================
 url = "https://panelapi.bubilet.com.tr/api/reports/company/2677/sales?FileName=Rapor"
 
 headers = {
@@ -55,32 +39,29 @@ headers = {
     "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 }
 
+print("⬇️ Bubilet Excel indiriliyor...")
 response = requests.get(url, headers=headers)
 
 if response.status_code != 200:
-    raise Exception(f"Bubilet API hata verdi: {response.status_code}")
+    raise Exception(f"Bubilet download failed: {response.status_code}")
 
-print("✅ Bubilet Excel indirildi")
+df = pd.read_excel(BytesIO(response.content))
+print(f"✅ Excel okundu: {len(df)} satır")
 
-# =====================
-# 4. EXCEL OKU
-# =====================
+# ===============================
+# GOOGLE SHEETS BAĞLAN
+# ===============================
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
 
-excel_bytes = BytesIO(response.content)
-df = pd.read_excel(excel_bytes)
+creds_dict = json.loads(GOOGLE_JSON)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client = gspread.authorize(creds)
 
-if df.empty:
-    raise Exception("Excel boş geldi")
+sheet = client.open_by_key(SHEET_ID).sheet1
+sheet.clear()
+sheet.update([df.columns.values.tolist()] + df.values.tolist())
 
-print(f"✅ Excel okundu ({len(df)} satır)")
-
-# =====================
-# 5. GOOGLE SHEETS'E YAZ
-# =====================
-
-worksheet.clear()
-worksheet.update(
-    [df.columns.tolist()] + df.fillna("").values.tolist()
-)
-
-print("🚀 Google Sheets güncellendi")
+print("🎉 Google Sheets güncellendi")
