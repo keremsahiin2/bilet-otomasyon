@@ -1,6 +1,14 @@
+name: Bilet Otomasyon
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *"   # her saat başı
+
 jobs:
   run:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
 
@@ -17,4 +25,3 @@ jobs:
 
       - name: Script çalıştır
         run: python main.py
-        
