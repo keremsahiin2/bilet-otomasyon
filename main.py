@@ -1,67 +1,58 @@
 import os
 import json
-import requests
+import time
 import pandas as pd
-from io import BytesIO
+from playwright.sync_api import sync_playwright
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 
-print("🚀 Script başladı")
-
-# ===============================
-# ENV KONTROL
-# ===============================
-BUBILET_TOKEN = os.getenv("BUBILET_TOKEN")
+EMAIL = os.getenv("BUBILET_EMAIL")
+PASSWORD = os.getenv("BUBILET_PASSWORD")
 SHEET_ID = os.getenv("SHEET_ID")
-GOOGLE_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+GJSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 
-print("🔍 ENV kontrol:")
-print("BUBILET_TOKEN var mı?", bool(BUBILET_TOKEN))
-print("SHEET_ID var mı?", bool(SHEET_ID))
-print("GOOGLE JSON var mı?", bool(GOOGLE_JSON))
+if not EMAIL or not PASSWORD:
+    raise Exception("BUBILET_EMAIL / BUBILET_PASSWORD yok")
 
-if not BUBILET_TOKEN:
-    raise Exception("BUBILET_TOKEN yok")
+if not SHEET_ID or not GJSON:
+    raise Exception("Google Sheet env eksik")
 
-if not SHEET_ID:
-    raise Exception("SHEET_ID yok")
+# ---- Google Sheets ----
+creds_dict = json.loads(GJSON)
+scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+gc = gspread.authorize(creds)
+sh = gc.open_by_key(SHEET_ID)
+ws = sh.sheet1
 
-if not GOOGLE_JSON:
-    raise Exception("GOOGLE_SERVICE_ACCOUNT_JSON yok")
+download_path = "/tmp/bubilet.xlsx"
 
-# ===============================
-# BUBILET EXCEL İNDİR
-# ===============================
-url = "https://panelapi.bubilet.com.tr/api/reports/company/2677/sales?FileName=Rapor"
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    context = browser.new_context(accept_downloads=True)
+    page = context.new_page()
 
-headers = {
-    "Authorization": f"Bearer {BUBILET_TOKEN}",
-    "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-}
+    # 1) Login
+    page.goto("https://partner.bubilet.com/")
+    page.fill('input[name="email"]', EMAIL)
+    page.fill('input[name="password"]', PASSWORD)
+    page.click('button[type="submit"]')
+    page.wait_for_load_state("networkidle")
 
-print("⬇️ Bubilet Excel indiriliyor...")
-response = requests.get(url, headers=headers)
+    # 2) Rapor sayfası
+    page.goto("https://partner.bubilet.com/reports/sales")
 
-if response.status_code != 200:
-    raise Exception(f"Bubilet download failed: {response.status_code}")
+    # 3) Excel indir
+    with page.expect_download() as d:
+        page.click("text=Excel")
+    download = d.value
+    download.save_as(download_path)
 
-df = pd.read_excel(BytesIO(response.content))
-print(f"✅ Excel okundu: {len(df)} satır")
+    browser.close()
 
-# ===============================
-# GOOGLE SHEETS BAĞLAN
-# ===============================
-scope = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive"
-]
+# ---- Excel → Sheet ----
+df = pd.read_excel(download_path)
+ws.clear()
+ws.update([df.columns.values.tolist()] + df.values.tolist())
 
-creds_dict = json.loads(GOOGLE_JSON)
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-client = gspread.authorize(creds)
-
-sheet = client.open_by_key(SHEET_ID).sheet1
-sheet.clear()
-sheet.update([df.columns.values.tolist()] + df.values.tolist())
-
-print("🎉 Google Sheets güncellendi")
+print("✅ Rapor başarıyla Sheet'e yazıldı")
