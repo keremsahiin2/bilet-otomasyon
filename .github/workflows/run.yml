@@ -2,18 +2,10 @@ name: Bilet Otomasyon
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 * * * *"   # her saat başı
 
 jobs:
   run:
     runs-on: ubuntu-latest
-
-    env:
-      BUBILET_TOKEN: ${{ secrets.BUBILET_TOKEN }}
-      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-      SHEET_ID: ${{ secrets.SHEET_ID }}
-
     steps:
       - uses: actions/checkout@v3
 
@@ -26,7 +18,12 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Playwright browser kur
-        run: playwright install chromium
+        run: python -m playwright install chromium
 
       - name: Script çalıştır
+        env:
+          BUBILET_EMAIL: ${{ secrets.BUBILET_EMAIL }}
+          BUBILET_PASSWORD: ${{ secrets.BUBILET_PASSWORD }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
         run: python main.py
