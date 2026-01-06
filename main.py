@@ -71,8 +71,15 @@ if response.status_code != 200:
 print("✅ Bubilet Excel indirildi")
 
 ham_df = pd.read_excel(io.BytesIO(response.content))
+
+# 🔴 TEST İÇİN KRİTİK EKLEME
+indirime_saati = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+ham_df["Excel_Indirme_Saati"] = indirime_saati  # J sütunu
 ham_df["KAYNAK"] = "BUBILET"
+
 write_df(ws_ham, ham_df)
+
+print(f"🕒 Excel indirme saati yazıldı: {indirime_saati}")
 
 # =====================
 # 2️⃣ HAM_VERI_2
