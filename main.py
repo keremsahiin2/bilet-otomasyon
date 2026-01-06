@@ -8,7 +8,6 @@ import math
 from google.oauth2.service_account import Credentials
 from collections import defaultdict
 from datetime import datetime
-import locale
 
 print("🚀 Script başladı")
 
@@ -28,7 +27,7 @@ if not all([BUBILET_TOKEN, SHEET_ID, GOOGLE_JSON]):
     raise Exception("❌ ENV eksik")
 
 # =====================
-# GOOGLE SHEETS BAĞLANTI
+# GOOGLE SHEETS
 # =====================
 creds_dict = json.loads(GOOGLE_JSON)
 scopes = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -73,31 +72,32 @@ print("✅ Bubilet Excel indirildi")
 
 ham_df = pd.read_excel(io.BytesIO(response.content))
 ham_df["KAYNAK"] = "BUBILET"
-
 write_df(ws_ham, ham_df)
 
 # =====================
-# 2️⃣ HAM_VERI_2 (İLERİDE 2. PLATFORM)
+# 2️⃣ HAM_VERI_2
 # =====================
 if ws_ham2.get_all_values() == []:
     ws_ham2.update([["2. PLATFORM BEKLENIYOR"]])
 
 print("✅ HAM_VERI yazıldı")
 
-# =====================================================
-# 3️⃣ PANEL → MAIL METNİ (FORMATLI)
-# =====================================================
-
-# Türkçe gün isimleri
-try:
-    locale.setlocale(locale.LC_TIME, "tr_TR.UTF-8")
-except:
-    locale.setlocale(locale.LC_TIME, "tr_TR")
-
+# =====================
+# 3️⃣ PANEL → MAIL FORMAT
+# =====================
 ws_panel = spreadsheet.worksheet("PANEL")
 rows = ws_panel.get_all_records()
 
-# { "22.06.2025 19:00": { "seramik": 3, "mum": 4 } }
+GUN_MAP = {
+    0: "Pazartesi",
+    1: "Salı",
+    2: "Çarşamba",
+    3: "Perşembe",
+    4: "Cuma",
+    5: "Cumartesi",
+    6: "Pazar"
+}
+
 seanslar = defaultdict(lambda: defaultdict(int))
 
 for r in rows:
@@ -106,7 +106,6 @@ for r in rows:
     etkinlik = str(r.get("Etkinlik", "")).strip()
     satis = r.get("Toplam Satış", 0)
 
-    # Boş / anlamsız satırları atla
     if not tarih or not saat or not etkinlik:
         continue
     if not isinstance(satis, (int, float)) or satis == 0:
@@ -116,13 +115,14 @@ for r in rows:
     seanslar[key][etkinlik] += int(satis)
 
 # =====================
-# MAIL BODY OLUŞTUR
+# MAIL BODY
 # =====================
 mail_body = "Merhaba,\n\nGüncel seans bazlı satış raporu:\n\n"
 
 for key in sorted(seanslar.keys()):
     dt = datetime.strptime(key, "%d.%m.%Y %H:%M")
-    baslik = dt.strftime("%d.%m.%Y %A %H:%M")
+    gun = GUN_MAP[dt.weekday()]
+    baslik = dt.strftime("%d.%m.%Y") + f" {gun} " + dt.strftime("%H:%M")
 
     mail_body += f"{baslik} seansı\n"
 
@@ -133,7 +133,7 @@ for key in sorted(seanslar.keys()):
 
 mail_body += "İyi çalışmalar."
 
-print("\n📧 OLUŞTURULAN MAIL METNİ:\n")
+print("\n📧 MAIL METNİ:\n")
 print(mail_body)
 
 print("\n🎉 Script başarıyla tamamlandı")
