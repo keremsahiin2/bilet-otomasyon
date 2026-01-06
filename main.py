@@ -92,7 +92,7 @@ if ws_ham2.get_all_values() == []:
 print("✅ HAM_VERI yazıldı")
 
 # =====================
-# 3️⃣ PANEL → MAIL FORMAT
+# 3️⃣ PANEL → MAIL FORMAT (SADECE OKUMA)
 # =====================
 ws_panel = spreadsheet.worksheet("PANEL")
 rows = ws_panel.get_all_records()
@@ -123,26 +123,19 @@ for r in rows:
     key = f"{tarih} {saat}"
     seanslar[key][etkinlik] += int(satis)
 
+print("📊 PANEL verileri okundu")
+
 # =====================
-# MAIL BODY
+# 4️⃣ GITHUB RUN FLAG (APPS SCRIPT TETİK)
 # =====================
-mail_body = "Merhaba,\n\nGüncel seans bazlı satış raporu:\n\n"
+print("🚩 GitHub run flag yazılıyor")
 
-for key in sorted(seanslar.keys()):
-    dt = datetime.strptime(key, "%d.%m.%Y %H:%M")
-    gun = GUN_MAP[dt.weekday()]
-    baslik = f"{dt.strftime('%d.%m.%Y')} {gun} {dt.strftime('%H:%M')}"
+flag_sheet = spreadsheet.worksheet("PANEL")
+flag_time = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
 
-    mail_body += f"{baslik} seansı\n"
+# Z2 = GitHub başarılı run sinyali
+flag_sheet.update("Z2", flag_time)
 
-    for etkinlik, adet in seanslar[key].items():
-        mail_body += f"- {adet} {etkinlik}\n"
+print(f"🚩 FLAG yazıldı → PANEL!Z2 = {flag_time}")
 
-    mail_body += "\n"
-
-mail_body += "İyi çalışmalar."
-
-print("\n📧 MAIL METNİ:\n")
-print(mail_body)
-
-print("\n🎉 Script başarıyla tamamlandı")
+print("\n🎉 Script BAŞARIYLA tamamlandı")
