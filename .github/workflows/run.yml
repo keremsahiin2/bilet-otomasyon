@@ -3,7 +3,7 @@ name: Bilet Otomasyon
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"   # ⏱️ 5 DAKİKADA BİR (GitHub Actions limiti)
+    - cron: "*/5 * * * *"   # ⏱️ 5 dakikada bir
 
 jobs:
   run:
@@ -23,6 +23,8 @@ jobs:
       - name: Script çalıştır
         env:
           BUBILET_TOKEN: ${{ secrets.BUBILET_TOKEN }}
+          BILETINAL_TOKEN: ${{ secrets.BILETINAL_TOKEN }}   # 🔥 EKSİK OLAN BUYDU
           SHEET_ID: ${{ secrets.SHEET_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
         run: python main.py
