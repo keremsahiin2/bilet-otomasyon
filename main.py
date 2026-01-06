@@ -20,6 +20,12 @@ SHEET_ID = os.getenv("SHEET_ID")
 GOOGLE_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL")
 
+print("BUBILET_TOKEN:", bool(BUBILET_TOKEN))
+print("BILETINAL_TOKEN:", bool(BILETINAL_TOKEN))
+print("SHEET_ID:", bool(SHEET_ID))
+print("GOOGLE_JSON:", bool(GOOGLE_JSON))
+
+
 if not all([BUBILET_TOKEN, BILETINAL_TOKEN, SHEET_ID, GOOGLE_JSON]):
     raise Exception("❌ ENV eksik")
 
