@@ -74,8 +74,7 @@ ham_df = pd.read_excel(io.BytesIO(response.content))
 
 # 🔥 EN SON SÜTUNA EXCEL İNDİRME SAATİ
 indirme_saati = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-son_index = len(ham_df.columns)
-ham_df.insert(son_index, "Excel_Indirme_Saati", indirme_saati)
+ham_df.insert(len(ham_df.columns), "Excel_Indirme_Saati", indirme_saati)
 
 ham_df["KAYNAK"] = "BUBILET"
 
@@ -92,7 +91,7 @@ if ws_ham2.get_all_values() == []:
 print("✅ HAM_VERI yazıldı")
 
 # =====================
-# 3️⃣ PANEL → MAIL FORMAT (SADECE OKUMA)
+# 3️⃣ PANEL → SADECE OKUMA
 # =====================
 ws_panel = spreadsheet.worksheet("PANEL")
 rows = ws_panel.get_all_records()
@@ -133,8 +132,8 @@ print("🚩 GitHub run flag yazılıyor")
 flag_sheet = spreadsheet.worksheet("PANEL")
 flag_time = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
 
-# Z2 = GitHub başarılı run sinyali
-flag_sheet.update("Z2", flag_time)
+# ❗ TEK VE KRİTİK DÜZELTME BURADA
+flag_sheet.update("Z2", [[flag_time]])
 
 print(f"🚩 FLAG yazıldı → PANEL!Z2 = {flag_time}")
 
