@@ -85,7 +85,7 @@ print("📥 Biletinal API çağrılıyor")
 
 today = datetime.now().strftime("%Y-%m-%d")
 
-biletinal_url = "https://reportapi2.biletinial.com/api/Report/GetActiveEventDetailList?FirstDate=Tue,+06+Jan+2026+22:45:04+GMT&LastDate=Tue,+06+Jan+2026+22:45:04+GMT&lang=tr"
+biletinal_url = "https://reportapi.biletinial.com/api/Report/GetActiveEventDetailList"
 biletinal_headers = {
     "Authorization": BILETINAL_TOKEN,
     "Accept": "application/json"
