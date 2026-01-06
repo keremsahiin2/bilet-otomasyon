@@ -1,48 +1,46 @@
 import os
-import json
 import requests
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
+from io import BytesIO
 
-BUBILET_TOKEN = os.getenv("BUBILET_TOKEN")
+print("▶ Script başladı")
+
+TOKEN = os.getenv("BUBILET_AUTH_TOKEN")
 SHEET_ID = os.getenv("SHEET_ID")
 GOOGLE_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 
-if not all([BUBILET_TOKEN, SHEET_ID, GOOGLE_JSON]):
+if not all([TOKEN, SHEET_ID, GOOGLE_JSON]):
     raise Exception("ENV eksik")
 
 print("▶ ENV tamam")
 
-# 🔽 Bubilet Excel URL
-URL = "https://panelapi.bubilet.com.tr/api/reports/company/2677/sales?FileName=Rapor"
+url = "https://panelapi.bubilet.com.tr/api/reports/company/2677/sales?FileName=Rapor"
 
 headers = {
-    "Authorization": f"Bearer {BUBILET_TOKEN}",
-    "Accept": "application/json"
+    "Authorization": f"Bearer {TOKEN}",
+    "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 }
 
-print("▶ Bubilet Excel indiriliyor")
-resp = requests.get(URL, headers=headers)
+response = requests.get(url, headers=headers)
 
-if resp.status_code != 200:
-    raise Exception(f"Bubilet Excel download failed: {resp.status_code}")
+if response.status_code != 200:
+    raise Exception(f"Bubilet download failed: {response.status_code}")
 
-with open("rapor.xlsx", "wb") as f:
-    f.write(resp.content)
+print("▶ Excel indirildi")
 
-print("✅ Excel indirildi")
+df = pd.read_excel(BytesIO(response.content))
 
-# Google Sheets bağlantısı
-creds_dict = json.loads(GOOGLE_JSON)
-scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+creds = Credentials.from_service_account_info(
+    eval(GOOGLE_JSON),
+    scopes=["https://www.googleapis.com/auth/spreadsheets"]
+)
+
 gc = gspread.authorize(creds)
 sheet = gc.open_by_key(SHEET_ID).sheet1
 
-df = pd.read_excel("rapor.xlsx")
-
 sheet.clear()
-sheet.update([df.columns.values.tolist()] + df.values.tolist())
+sheet.update([df.columns.tolist()] + df.values.tolist())
 
 print("✅ Google Sheets güncellendi")
