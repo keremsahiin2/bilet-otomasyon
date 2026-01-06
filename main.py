@@ -1,106 +1,121 @@
-import os
-import requests
-import pandas as pd
-import io
-import json
-import gspread
-import math
-from google.oauth2.service_account import Credentials
-from datetime import datetime
+/**
+ * ⏱️ Time-driven trigger ile çalışır (5 dk)
+ * GitHub run başarılıysa (PANEL!Z2 değiştiyse)
+ * SADECE 1 KEZ mail gönderir
+ */
+function githubRunKontrolVeMail() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    Logger.log("⏳ Kilit alınamadı, çıkılıyor");
+    return;
+  }
 
-print("🚀 Script başladı")
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("PANEL");
 
-# =====================
-# ENV
-# =====================
-BUBILET_TOKEN = os.getenv("BUBILET_TOKEN")
-SHEET_ID = os.getenv("SHEET_ID")
-GOOGLE_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    const flag = sheet.getRange("Z2").getValue();   // GitHub run timestamp
+    const lastSent = sheet.getRange("Z3").getValue(); // Mail kilidi
 
-print("ENV kontrolü:")
-print("BUBILET_TOKEN var mı?", bool(BUBILET_TOKEN))
-print("SHEET_ID var mı?", bool(SHEET_ID))
-print("GOOGLE_JSON var mı?", bool(GOOGLE_JSON))
+    // Flag yoksa çık
+    if (!flag) {
+      Logger.log("🚫 Z2 boş, çıkıldı");
+      return;
+    }
 
-if not all([BUBILET_TOKEN, SHEET_ID, GOOGLE_JSON]):
-    raise Exception("❌ ENV eksik")
+    // Aynı run için mail zaten atıldıysa çık
+    if (flag === lastSent) {
+      Logger.log("⏭️ Bu run için mail zaten gönderilmiş");
+      return;
+    }
 
-# =====================
-# GOOGLE SHEETS
-# =====================
-creds_dict = json.loads(GOOGLE_JSON)
-scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-client = gspread.authorize(creds)
-spreadsheet = client.open_by_key(SHEET_ID)
+    // 📧 Mail gönder
+    const mailGonderildi = gunlukSeansMailiGonder();
 
-def ws(name):
-    try:
-        return spreadsheet.worksheet(name)
-    except:
-        return spreadsheet.add_worksheet(title=name, rows=2000, cols=30)
+    // ❗ SADECE mail başarıyla gittiyse kilitle
+    if (mailGonderildi === true) {
+      sheet.getRange("Z3").setValue(flag);
+      Logger.log("✅ Mail gönderildi ve kilitlendi");
+    } else {
+      Logger.log("⚠️ Mail gönderilemedi, kilitlenmedi");
+    }
 
-ws_ham = ws("HAM_VERI")
-ws_ham2 = ws("HAM_VERI_2")
-ws_panel = ws("PANEL")
-
-def write_df(ws, df):
-    ws.clear()
-    if df.empty:
-        ws.update([["BOS"]])
-        return
-    df = df.replace([math.inf, -math.inf], "").fillna("")
-    ws.update([df.columns.tolist()] + df.values.tolist())
-
-# =====================
-# 1️⃣ BUBILET → HAM_VERI
-# =====================
-print("📥 Bubilet Excel indiriliyor")
-
-url = "https://panelapi.bubilet.com.tr/api/reports/company/2677/sales?FileName=Rapor"
-headers = {
-    "Authorization": BUBILET_TOKEN,  # Bearer TOKEN
-    "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  } catch (err) {
+    Logger.log("❌ HATA: " + err);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
-response = requests.get(url, headers=headers)
+/**
+ * 📧 Seans bazlı satış maili
+ * @returns {boolean} mail gönderildiyse true
+ */
+function gunlukSeansMailiGonder() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("PANEL");
+    const data = sheet.getDataRange().getValues();
 
-if response.status_code != 200:
-    raise Exception(f"❌ Bubilet download failed: {response.status_code}")
+    const tz = ss.getSpreadsheetTimeZone();
+    const gunler = ["Pazar","Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi"];
 
-print("✅ Bubilet Excel indirildi")
+    let seanslar = {};
 
-ham_df = pd.read_excel(io.BytesIO(response.content))
+    for (let i = 1; i < data.length; i++) {
+      const tarih = data[i][0]; // Tarih
+      const saat = data[i][1];  // Saat
+      const etkinlik = data[i][2];
+      const satis = data[i][3];
 
-# =====================
-# 2️⃣ EXCEL İNDİRME SAATİ (SON SÜTUN)
-# =====================
-indirme_saati = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-ham_df.insert(len(ham_df.columns), "Excel_Indirme_Saati", indirme_saati)
-ham_df["KAYNAK"] = "BUBILET"
+      if (!tarih || !saat || !etkinlik || !satis || satis == 0) continue;
 
-write_df(ws_ham, ham_df)
+      const dt = new Date(tarih);
+      const gun = gunler[dt.getDay()];
+      const tarihStr = Utilities.formatDate(dt, tz, "dd.MM.yyyy");
+      const saatStr = Utilities.formatDate(new Date(saat), tz, "HH:mm");
 
-print(f"🕒 Excel indirme saati yazıldı: {indirme_saati}")
+      const key = `${tarihStr} ${gun} ${saatStr}`;
 
-# =====================
-# 3️⃣ HAM_VERI_2 (ileride)
-# =====================
-if ws_ham2.get_all_values() == []:
-    ws_ham2.update([["2. PLATFORM BEKLENIYOR"]])
+      if (!seanslar[key]) seanslar[key] = {};
+      seanslar[key][etkinlik] = (seanslar[key][etkinlik] || 0) + Number(satis);
+    }
 
-print("✅ HAM_VERI yazıldı")
+    if (Object.keys(seanslar).length === 0) {
+      Logger.log("📭 Gönderilecek seans yok");
+      return false;
+    }
 
-# =====================
-# 4️⃣ GITHUB RUN FLAG (APPS SCRIPT TETİK)
-# =====================
-print("🚩 GitHub run flag yazılıyor")
+    let body = "Merhaba,\n\nGüncel seans bazlı satış raporu:\n\n";
 
-flag_time = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+    Object.keys(seanslar).sort().forEach(seans => {
+      body += `${seans} seansı\n`;
+      Object.keys(seanslar[seans]).forEach(etkinlik => {
+        body += `- ${seanslar[seans][etkinlik]} ${etkinlik}\n`;
+      });
+      body += "\n";
+    });
 
-# ❗ DOĞRU FORMAT
-ws_panel.update("Z2", [[flag_time]])
+    body += "İyi çalışmalar.";
 
-print(f"🚩 FLAG yazıldı → PANEL!Z2 = {flag_time}")
+    // 📧 ALICILAR
+    const alicilar = [
+      "biletkontrolssa@gmail.com"
+      // "ikinci@mail.com",
+      // "ucuncu@mail.com"
+    ];
 
-print("\n🎉 Script BAŞARIYLA tamamlandı")
+    MailApp.sendEmail({
+      to: alicilar.join(","),
+      subject: "Günlük Seans Bazlı Satış Raporu",
+      body: body
+    });
+
+    Logger.log("📧 Mail başarıyla gönderildi");
+    return true;
+
+  } catch (err) {
+    Logger.log("❌ Mail gönderim hatası: " + err);
+    return false;
+  }
+}
