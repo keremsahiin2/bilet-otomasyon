@@ -6,6 +6,7 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
 
@@ -15,10 +16,9 @@ jobs:
           python-version: "3.10"
 
       - name: Paketleri kur
-        run: pip install -r requirements.txt
-
-      - name: Playwright browser kur
-        run: python -m playwright install chromium
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium
 
       - name: Script çalıştır
         env:
