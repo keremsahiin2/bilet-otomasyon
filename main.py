@@ -16,7 +16,7 @@ if not all([EMAIL, PASSWORD, SHEET_ID, GOOGLE_JSON]):
 
 print("▶ Script başladı")
 
-# Google Sheets bağlan
+# Google Sheets
 creds_dict = json.loads(GOOGLE_JSON)
 scopes = ["https://www.googleapis.com/auth/spreadsheets"]
 creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
@@ -29,22 +29,29 @@ with sync_playwright() as p:
     page = context.new_page()
 
     print("▶ Bubilet login sayfası")
-    page.goto("https://panel.bubilet.com.tr/", wait_until="load")
+    page.goto("https://panel.bubilet.com.tr/", wait_until="domcontentloaded")
+    page.wait_for_timeout(5000)
 
-    page.fill('input[type="email"]', EMAIL)
-    page.fill('input[type="password"]', PASSWORD)
-    page.click('button[type="submit"]')
+    # 🔥 GÜNCEL SELECTOR STRATEJİSİ
+    email_input = page.locator("input").nth(0)
+    password_input = page.locator("input").nth(1)
+
+    email_input.fill(EMAIL)
+    password_input.fill(PASSWORD)
+
+    page.locator("button").nth(0).click()
 
     page.wait_for_load_state("networkidle")
-    time.sleep(3)
+    time.sleep(5)
 
     print("▶ Satış raporuna gidiliyor")
     page.goto("https://panel.bubilet.com.tr/satis-rapor", wait_until="load")
-    time.sleep(3)
+    time.sleep(5)
 
     print("▶ Excel indiriliyor")
     with page.expect_download() as download_info:
-        page.click("text=Excel indir")
+        page.locator("text=Excel indir").click()
+
     download = download_info.value
     path = download.path()
 
