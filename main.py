@@ -5,6 +5,7 @@ import io
 import json
 import gspread
 import math
+import time
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
@@ -16,7 +17,7 @@ print("🚀 Script başladı")
 BUBILET_TOKEN = os.getenv("BUBILET_TOKEN")
 SHEET_ID = os.getenv("SHEET_ID")
 GOOGLE_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL")  # 👈 YENİ
+APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL")  # 👈 Opsiyonel ama ÖNERİLİR
 
 if not all([BUBILET_TOKEN, SHEET_ID, GOOGLE_JSON]):
     raise Exception("❌ ENV eksik")
@@ -82,15 +83,16 @@ if ws_ham2.get_all_values() == []:
     ws_ham2.update([["2. PLATFORM BEKLENIYOR"]])
 
 # =====================
-# 4️⃣ FLAG YAZ
+# 4️⃣ GITHUB RUN FLAG (🔥 KRİTİK)
 # =====================
-flag_time = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-ws_panel.update("Z2", [[flag_time]])
+# ❗ Artık timestamp DEĞİL → benzersiz RUN_ID
+run_id = f"RUN_{int(time.time() * 1000)}"
+ws_panel.update("Z2", [[run_id]])
 
-print(f"🚩 FLAG yazıldı → PANEL!Z2 = {flag_time}")
+print(f"🚩 RUN FLAG yazıldı → PANEL!Z2 = {run_id}")
 
 # =====================
-# 5️⃣ APPS SCRIPT WEB APP TETİKLE
+# 5️⃣ APPS SCRIPT WEB APP TETİKLE (OPSİYONEL AMA GÜÇLÜ)
 # =====================
 if APPS_SCRIPT_URL:
     try:
