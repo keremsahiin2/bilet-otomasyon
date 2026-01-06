@@ -37,11 +37,10 @@ def ws(name):
     try:
         return spreadsheet.worksheet(name)
     except:
-        return spreadsheet.add_worksheet(title=name, rows=1000, cols=30)
+        return spreadsheet.add_worksheet(title=name, rows=2000, cols=30)
 
 ws_ham = ws("HAM_VERI")
 ws_ham2 = ws("HAM_VERI_2")
-ws_duzgun = ws("DUZGUN_VERI")
 
 def write_df(ws, df):
     ws.clear()
@@ -76,46 +75,9 @@ ham_df["KAYNAK"] = "BUBILET"
 write_df(ws_ham, ham_df)
 
 # =====================
-# 2️⃣ HAM_VERI_2 (ŞİMDİLİK BOŞ)
+# 2️⃣ HAM_VERI_2 (İLERİDE 2. PLATFORM)
 # =====================
 if ws_ham2.get_all_values() == []:
     ws_ham2.update([["2. PLATFORM BEKLENIYOR"]])
 
-# =====================
-# 3️⃣ HAM → DUZGUN_VERI
-# =====================
-def safe_float(x):
-    try:
-        return float(str(x).replace(",", "."))
-    except:
-        return 0.0
-
-def normalize(df, platform):
-    rename = {}
-    for c in df.columns:
-        l = c.lower()
-        if "tarih" in l:
-            rename[c] = "Tarih"
-        elif "etkinlik" in l:
-            rename[c] = "Etkinlik"
-        elif "bilet" in l or "adet" in l:
-            rename[c] = "Satilan_Bilet"
-        elif "ciro" in l or "tutar" in l:
-            rename[c] = "Ciro"
-
-    df = df.rename(columns=rename)
-
-    for col in ["Tarih", "Etkinlik", "Satilan_Bilet", "Ciro"]:
-        if col not in df:
-            df[col] = ""
-
-    df["Platform"] = platform
-    df["Satilan_Bilet"] = df["Satilan_Bilet"].apply(safe_float)
-    df["Ciro"] = df["Ciro"].apply(safe_float)
-
-    return df[["Tarih", "Etkinlik", "Platform", "Satilan_Bilet", "Ciro"]]
-
-duzgun_df = normalize(ham_df, "BUBILET")
-write_df(ws_duzgun, duzgun_df)
-
-print("🎉 HAM_VERI → DUZGUN_VERI tamamlandı")
+print("🎉 Sadece HAM_VERI yazıldı. DUZGUN_VERI ve PANEL Sheets tarafından yönetiliyor.")
