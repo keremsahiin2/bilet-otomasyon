@@ -59,7 +59,7 @@ print("📥 Bubilet Excel indiriliyor")
 
 url = "https://panelapi.bubilet.com.tr/api/reports/company/2677/sales?FileName=Rapor"
 headers = {
-    "Authorization": BUBILET_TOKEN,
+    "Authorization": BUBILET_TOKEN,  # Bearer TOKEN
     "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 }
 
@@ -72,14 +72,16 @@ print("✅ Bubilet Excel indirildi")
 
 ham_df = pd.read_excel(io.BytesIO(response.content))
 
-# 🔴 TEST İÇİN KRİTİK EKLEME
-indirime_saati = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-ham_df["Excel_Indirme_Saati"] = indirime_saati  # J sütunu
+# 🔥 EN SON SÜTUNA EXCEL İNDİRME SAATİ
+indirme_saati = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+son_index = len(ham_df.columns)
+ham_df.insert(son_index, "Excel_Indirme_Saati", indirme_saati)
+
 ham_df["KAYNAK"] = "BUBILET"
 
 write_df(ws_ham, ham_df)
 
-print(f"🕒 Excel indirme saati yazıldı: {indirime_saati}")
+print(f"🕒 Excel indirme saati yazıldı: {indirme_saati}")
 
 # =====================
 # 2️⃣ HAM_VERI_2
@@ -129,7 +131,7 @@ mail_body = "Merhaba,\n\nGüncel seans bazlı satış raporu:\n\n"
 for key in sorted(seanslar.keys()):
     dt = datetime.strptime(key, "%d.%m.%Y %H:%M")
     gun = GUN_MAP[dt.weekday()]
-    baslik = dt.strftime("%d.%m.%Y") + f" {gun} " + dt.strftime("%H:%M")
+    baslik = f"{dt.strftime('%d.%m.%Y')} {gun} {dt.strftime('%H:%M')}"
 
     mail_body += f"{baslik} seansı\n"
 
