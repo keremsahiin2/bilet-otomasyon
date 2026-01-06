@@ -15,11 +15,12 @@ print("🚀 Script başladı")
 # ENV
 # =====================
 BUBILET_TOKEN = os.getenv("BUBILET_TOKEN")
+BILETINAL_TOKEN = os.getenv("BILETINAL_TOKEN")  # 👈 YENİ
 SHEET_ID = os.getenv("SHEET_ID")
 GOOGLE_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL")  # 👈 Opsiyonel ama ÖNERİLİR
+APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL")
 
-if not all([BUBILET_TOKEN, SHEET_ID, GOOGLE_JSON]):
+if not all([BUBILET_TOKEN, BILETINAL_TOKEN, SHEET_ID, GOOGLE_JSON]):
     raise Exception("❌ ENV eksik")
 
 # =====================
@@ -35,7 +36,7 @@ def ws(name):
     try:
         return spreadsheet.worksheet(name)
     except:
-        return spreadsheet.add_worksheet(title=name, rows=2000, cols=30)
+        return spreadsheet.add_worksheet(title=name, rows=3000, cols=40)
 
 ws_ham = ws("HAM_VERI")
 ws_ham2 = ws("HAM_VERI_2")
@@ -65,41 +66,71 @@ if response.status_code != 200:
     raise Exception(f"❌ Bubilet download failed: {response.status_code}")
 
 ham_df = pd.read_excel(io.BytesIO(response.content))
-
-# =====================
-# 2️⃣ Excel indirme saati
-# =====================
-indirme_saati = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-ham_df.insert(len(ham_df.columns), "Excel_Indirme_Saati", indirme_saati)
+ham_df["Excel_Indirme_Saati"] = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
 ham_df["KAYNAK"] = "BUBILET"
 
 write_df(ws_ham, ham_df)
-print(f"🕒 Excel indirme saati: {indirme_saati}")
+print("✅ Bubilet HAM_VERI yazıldı")
 
 # =====================
-# 3️⃣ HAM_VERI_2 (şimdilik boş)
+# 2️⃣ BILETINAL → HAM_VERI_2
 # =====================
-if ws_ham2.get_all_values() == []:
-    ws_ham2.update([["2. PLATFORM BEKLENIYOR"]])
+print("📥 Biletinal API çağrılıyor")
+
+today = datetime.now().strftime("%Y-%m-%d")
+
+biletinal_url = "https://reportapi2.biletinial.com/Report/GetActiveEventDetailList"
+biletinal_headers = {
+    "Authorization": BILETINAL_TOKEN,
+    "Accept": "application/json"
+}
+
+params = {
+    "FirstDate": f"{today}T00:00:00",
+    "LastDate": f"{today}T23:59:59",
+    "lang": "tr"
+}
+
+resp = requests.get(biletinal_url, headers=biletinal_headers, params=params)
+if resp.status_code != 200:
+    raise Exception("❌ Biletinal API hata verdi")
+
+data = resp.json().get("Data", [])
+
+rows = []
+for item in data:
+    rows.append({
+        "EventName": item.get("EventName"),
+        "SeanceDate": item.get("SeanceDate"),
+        "City": item.get("CityName"),
+        "Venue": item.get("CinemaBranchName"),
+        "SoldToday": item.get("SalesTicketTotalCount"),
+        "TotalAmount": item.get("TotalAmount"),
+        "Currency": item.get("Currency"),
+        "WebLink": item.get("WebLink"),
+        "KAYNAK": "BILETINAL"
+    })
+
+df_biletinal = pd.DataFrame(rows)
+write_df(ws_ham2, df_biletinal)
+
+print(f"✅ Biletinal HAM_VERI_2 yazıldı ({len(df_biletinal)} kayıt)")
 
 # =====================
-# 4️⃣ GITHUB RUN FLAG (🔥 KRİTİK)
+# 3️⃣ RUN FLAG (BENZERSİZ)
 # =====================
-# ❗ Artık timestamp DEĞİL → benzersiz RUN_ID
 run_id = f"RUN_{int(time.time() * 1000)}"
 ws_panel.update("Z2", [[run_id]])
-
-print(f"🚩 RUN FLAG yazıldı → PANEL!Z2 = {run_id}")
+print(f"🚩 RUN FLAG yazıldı → {run_id}")
 
 # =====================
-# 5️⃣ APPS SCRIPT WEB APP TETİKLE (OPSİYONEL AMA GÜÇLÜ)
+# 4️⃣ APPS SCRIPT TETİK (OPSİYONEL)
 # =====================
 if APPS_SCRIPT_URL:
     try:
         print("📡 Apps Script tetikleniyor")
-        r = requests.post(APPS_SCRIPT_URL, timeout=10)
-        print("📨 Apps Script response:", r.text)
-    except Exception as e:
-        print("⚠️ Apps Script çağrı hatası:", e)
+        requests.post(APPS_SCRIPT_URL, timeout=10)
+    except:
+        pass
 
-print("\n🎉 Script BAŞARIYLA tamamlandı")
+print("\n🎉 TÜM SÜREÇ BAŞARIYLA TAMAMLANDI")
