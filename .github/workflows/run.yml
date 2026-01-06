@@ -3,7 +3,7 @@ name: Bilet Otomasyon
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "*/5 * * * *"   # ⏱️ 5 DAKİKADA BİR (GitHub Actions limiti)
 
 jobs:
   run:
