@@ -1,6 +1,6 @@
 import os
-import json
 import time
+import json
 import pandas as pd
 from playwright.sync_api import sync_playwright
 import gspread
@@ -9,50 +9,52 @@ from google.oauth2.service_account import Credentials
 EMAIL = os.getenv("BUBILET_EMAIL")
 PASSWORD = os.getenv("BUBILET_PASSWORD")
 SHEET_ID = os.getenv("SHEET_ID")
-GJSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+GOOGLE_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 
-if not EMAIL or not PASSWORD:
-    raise Exception("BUBILET_EMAIL / BUBILET_PASSWORD yok")
+if not all([EMAIL, PASSWORD, SHEET_ID, GOOGLE_JSON]):
+    raise Exception("ENV eksik")
 
-if not SHEET_ID or not GJSON:
-    raise Exception("Google Sheet env eksik")
+print("▶ Script başladı")
 
-# ---- Google Sheets ----
-creds_dict = json.loads(GJSON)
+# Google Sheets bağlan
+creds_dict = json.loads(GOOGLE_JSON)
 scopes = ["https://www.googleapis.com/auth/spreadsheets"]
 creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
 gc = gspread.authorize(creds)
-sh = gc.open_by_key(SHEET_ID)
-ws = sh.sheet1
-
-download_path = "/tmp/bubilet.xlsx"
+sheet = gc.open_by_key(SHEET_ID).sheet1
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     context = browser.new_context(accept_downloads=True)
     page = context.new_page()
 
-    # 1) Login
-    page.goto("https://partner.bubilet.com/")
-    page.fill('input[name="email"]', EMAIL)
-    page.fill('input[name="password"]', PASSWORD)
+    print("▶ Bubilet login sayfası")
+    page.goto("https://panel.bubilet.com.tr/", wait_until="load")
+
+    page.fill('input[type="email"]', EMAIL)
+    page.fill('input[type="password"]', PASSWORD)
     page.click('button[type="submit"]')
+
     page.wait_for_load_state("networkidle")
+    time.sleep(3)
 
-    # 2) Rapor sayfası
-    page.goto("https://partner.bubilet.com/reports/sales")
+    print("▶ Satış raporuna gidiliyor")
+    page.goto("https://panel.bubilet.com.tr/satis-rapor", wait_until="load")
+    time.sleep(3)
 
-    # 3) Excel indir
-    with page.expect_download() as d:
-        page.click("text=Excel")
-    download = d.value
-    download.save_as(download_path)
+    print("▶ Excel indiriliyor")
+    with page.expect_download() as download_info:
+        page.click("text=Excel indir")
+    download = download_info.value
+    path = download.path()
+
+    print("▶ Excel alındı:", path)
+
+    df = pd.read_excel(path)
+
+    sheet.clear()
+    sheet.update([df.columns.values.tolist()] + df.values.tolist())
+
+    print("✅ Google Sheets güncellendi")
 
     browser.close()
-
-# ---- Excel → Sheet ----
-df = pd.read_excel(download_path)
-ws.clear()
-ws.update([df.columns.values.tolist()] + df.values.tolist())
-
-print("✅ Rapor başarıyla Sheet'e yazıldı")
