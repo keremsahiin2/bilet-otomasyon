@@ -6,7 +6,6 @@ import json
 import gspread
 import math
 from google.oauth2.service_account import Credentials
-from collections import defaultdict
 from datetime import datetime
 
 print("🚀 Script başladı")
@@ -17,6 +16,11 @@ print("🚀 Script başladı")
 BUBILET_TOKEN = os.getenv("BUBILET_TOKEN")
 SHEET_ID = os.getenv("SHEET_ID")
 GOOGLE_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+
+print("ENV kontrolü:")
+print("BUBILET_TOKEN var mı?", bool(BUBILET_TOKEN))
+print("SHEET_ID var mı?", bool(SHEET_ID))
+print("GOOGLE_JSON var mı?", bool(GOOGLE_JSON))
 
 if not all([BUBILET_TOKEN, SHEET_ID, GOOGLE_JSON]):
     raise Exception("❌ ENV eksik")
@@ -38,7 +42,7 @@ def ws(name):
 
 ws_ham = ws("HAM_VERI")
 ws_ham2 = ws("HAM_VERI_2")
-ws_panel = spreadsheet.worksheet("PANEL")
+ws_panel = ws("PANEL")
 
 def write_df(ws, df):
     ws.clear()
@@ -55,72 +59,48 @@ print("📥 Bubilet Excel indiriliyor")
 
 url = "https://panelapi.bubilet.com.tr/api/reports/company/2677/sales?FileName=Rapor"
 headers = {
-    "Authorization": BUBILET_TOKEN,
+    "Authorization": BUBILET_TOKEN,  # Bearer TOKEN
     "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 }
 
 response = requests.get(url, headers=headers)
+
 if response.status_code != 200:
     raise Exception(f"❌ Bubilet download failed: {response.status_code}")
 
+print("✅ Bubilet Excel indirildi")
+
 ham_df = pd.read_excel(io.BytesIO(response.content))
 
-# Excel indirme zamanı (EN SON SÜTUN)
+# =====================
+# 2️⃣ EXCEL İNDİRME SAATİ (SON SÜTUN)
+# =====================
 indirme_saati = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
 ham_df.insert(len(ham_df.columns), "Excel_Indirme_Saati", indirme_saati)
 ham_df["KAYNAK"] = "BUBILET"
 
 write_df(ws_ham, ham_df)
+
 print(f"🕒 Excel indirme saati yazıldı: {indirme_saati}")
 
 # =====================
-# 2️⃣ HAM_VERI_2
+# 3️⃣ HAM_VERI_2 (ileride)
 # =====================
 if ws_ham2.get_all_values() == []:
     ws_ham2.update([["2. PLATFORM BEKLENIYOR"]])
 
-# =====================
-# 3️⃣ PANEL OKUMA (🔥 SAFE MODE)
-# =====================
-print("📊 PANEL verileri okunuyor")
-
-values = ws_panel.get_all_values()
-headers = values[0]
-rows = values[1:]
-
-# sütun indexleri
-IDX_TARIH = headers.index("Tarih")
-IDX_SAAT = headers.index("Saat")
-IDX_ETKINLIK = headers.index("Etkinlik")
-IDX_SATIS = headers.index("Toplam Satış")
-
-seanslar = defaultdict(lambda: defaultdict(int))
-
-for r in rows:
-    try:
-        tarih = str(r[IDX_TARIH]).strip()
-        saat = str(r[IDX_SAAT]).strip()
-        etkinlik = str(r[IDX_ETKINLIK]).strip()
-        satis = r[IDX_SATIS]
-
-        if not tarih or not saat or not etkinlik:
-            continue
-        if not isinstance(satis, (int, float)) or satis == 0:
-            continue
-
-        key = f"{tarih} {saat}"
-        seanslar[key][etkinlik] += int(satis)
-
-    except Exception:
-        continue
-
-print("✅ PANEL verileri okundu")
+print("✅ HAM_VERI yazıldı")
 
 # =====================
 # 4️⃣ GITHUB RUN FLAG (APPS SCRIPT TETİK)
 # =====================
+print("🚩 GitHub run flag yazılıyor")
+
 flag_time = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-ws_panel.update("Z2", flag_time)
+
+# ❗ DOĞRU FORMAT
+ws_panel.update("Z2", [[flag_time]])
 
 print(f"🚩 FLAG yazıldı → PANEL!Z2 = {flag_time}")
-print("🎉 Script başarıyla tamamlandı")
+
+print("\n🎉 Script BAŞARIYLA tamamlandı")
