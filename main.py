@@ -6,6 +6,9 @@ import json
 import gspread
 import math
 from google.oauth2.service_account import Credentials
+from collections import defaultdict
+from datetime import datetime
+import locale
 
 print("🚀 Script başladı")
 
@@ -25,7 +28,7 @@ if not all([BUBILET_TOKEN, SHEET_ID, GOOGLE_JSON]):
     raise Exception("❌ ENV eksik")
 
 # =====================
-# GOOGLE SHEETS
+# GOOGLE SHEETS BAĞLANTI
 # =====================
 creds_dict = json.loads(GOOGLE_JSON)
 scopes = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -56,7 +59,6 @@ def write_df(ws, df):
 print("📥 Bubilet Excel indiriliyor")
 
 url = "https://panelapi.bubilet.com.tr/api/reports/company/2677/sales?FileName=Rapor"
-
 headers = {
     "Authorization": BUBILET_TOKEN,
     "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -80,4 +82,58 @@ write_df(ws_ham, ham_df)
 if ws_ham2.get_all_values() == []:
     ws_ham2.update([["2. PLATFORM BEKLENIYOR"]])
 
-print("🎉 Sadece HAM_VERI yazıldı. DUZGUN_VERI ve PANEL Sheets tarafından yönetiliyor.")
+print("✅ HAM_VERI yazıldı")
+
+# =====================================================
+# 3️⃣ PANEL → MAIL METNİ (FORMATLI)
+# =====================================================
+
+# Türkçe gün isimleri
+try:
+    locale.setlocale(locale.LC_TIME, "tr_TR.UTF-8")
+except:
+    locale.setlocale(locale.LC_TIME, "tr_TR")
+
+ws_panel = spreadsheet.worksheet("PANEL")
+rows = ws_panel.get_all_records()
+
+# { "22.06.2025 19:00": { "seramik": 3, "mum": 4 } }
+seanslar = defaultdict(lambda: defaultdict(int))
+
+for r in rows:
+    tarih = str(r.get("Tarih", "")).strip()
+    saat = str(r.get("Saat", "")).strip()
+    etkinlik = str(r.get("Etkinlik", "")).strip()
+    satis = r.get("Toplam Satış", 0)
+
+    # Boş / anlamsız satırları atla
+    if not tarih or not saat or not etkinlik:
+        continue
+    if not isinstance(satis, (int, float)) or satis == 0:
+        continue
+
+    key = f"{tarih} {saat}"
+    seanslar[key][etkinlik] += int(satis)
+
+# =====================
+# MAIL BODY OLUŞTUR
+# =====================
+mail_body = "Merhaba,\n\nGüncel seans bazlı satış raporu:\n\n"
+
+for key in sorted(seanslar.keys()):
+    dt = datetime.strptime(key, "%d.%m.%Y %H:%M")
+    baslik = dt.strftime("%d.%m.%Y %A %H:%M")
+
+    mail_body += f"{baslik} seansı\n"
+
+    for etkinlik, adet in seanslar[key].items():
+        mail_body += f"- {adet} {etkinlik}\n"
+
+    mail_body += "\n"
+
+mail_body += "İyi çalışmalar."
+
+print("\n📧 OLUŞTURULAN MAIL METNİ:\n")
+print(mail_body)
+
+print("\n🎉 Script başarıyla tamamlandı")
