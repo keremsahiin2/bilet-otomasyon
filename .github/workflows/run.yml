@@ -2,10 +2,13 @@ name: Bilet Otomasyon
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *"
 
 jobs:
   run:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
 
@@ -15,11 +18,11 @@ jobs:
           python-version: "3.10"
 
       - name: Paketleri kur
-        run: pip install -r requirements.txt
+        run: pip install pandas requests gspread google-auth openpyxl
 
       - name: Script çalıştır
         env:
-          BUBILET_AUTH_TOKEN: ${{ secrets.BUBILET_AUTH_TOKEN }}
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          BUBILET_TOKEN: ${{ secrets.BUBILET_TOKEN }}
           SHEET_ID: ${{ secrets.SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
         run: python main.py
