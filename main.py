@@ -14,14 +14,13 @@ print("🚀 Script başladı")
 # =====================
 # ENV
 # =====================
-BUBILET_EMAIL    = os.getenv("BUBILET_EMAIL")
-BUBILET_PASSWORD = os.getenv("BUBILET_PASSWORD")
-SHEET_ID         = os.getenv("SHEET_ID")
-GOOGLE_JSON      = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-APPS_SCRIPT_URL  = os.getenv("APPS_SCRIPT_URL")  # opsiyonel
+BUBILET_TOKEN = os.getenv("BUBILET_TOKEN")
+SHEET_ID      = os.getenv("SHEET_ID")
+GOOGLE_JSON   = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL")
 
-if not all([BUBILET_EMAIL, BUBILET_PASSWORD, SHEET_ID, GOOGLE_JSON]):
-    raise Exception("❌ ENV eksik: BUBILET_EMAIL, BUBILET_PASSWORD, SHEET_ID, GOOGLE_SERVICE_ACCOUNT_JSON gerekli")
+if not all([BUBILET_TOKEN, SHEET_ID, GOOGLE_JSON]):
+    raise Exception("❌ ENV eksik: BUBILET_TOKEN, SHEET_ID, GOOGLE_SERVICE_ACCOUNT_JSON gerekli")
 print("✅ ENV OK")
 
 # =====================
@@ -52,93 +51,46 @@ def write_df(ws, df):
     ws.update([df.columns.tolist()] + df.values.tolist())
 
 # =====================
-# BUBILET SESSION
-# =====================
-BASE_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Connection": "keep-alive",
-}
-
-session = requests.Session()
-session.headers.update(BASE_HEADERS)
-
-# =====================
-# 1️⃣ LOGIN
-# =====================
-print("🔐 Bubilet'e giriş yapılıyor...")
-
-LOGIN_URL = "https://panelapi.bubilet.com.tr/api/auth/login"
-
-login_payload = {
-    "email": BUBILET_EMAIL,
-    "password": BUBILET_PASSWORD,
-}
-
-login_headers = {
-    **BASE_HEADERS,
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-    "Origin": "https://panel.bubilet.com.tr",
-    "Referer": "https://panel.bubilet.com.tr/",
-}
-
-for attempt in range(1, 4):
-    try:
-        print(f"🔄 Login deneme {attempt}/3...")
-        login_resp = session.post(LOGIN_URL, json=login_payload, headers=login_headers, timeout=30)
-        print(f"   HTTP {login_resp.status_code}")
-        if login_resp.status_code == 200:
-            break
-        time.sleep(attempt * 3)
-    except requests.exceptions.RequestException as e:
-        print(f"⚠️ Bağlantı hatası: {e}")
-        if attempt < 3:
-            time.sleep(attempt * 3)
-else:
-    raise Exception(f"❌ Login başarısız: {login_resp.status_code} → {login_resp.text[:300]}")
-
-# Token'ı response'dan al
-try:
-    token_data = login_resp.json()
-    token = token_data.get("token") or token_data.get("access_token") or token_data.get("data", {}).get("token")
-    if not token:
-        raise Exception(f"❌ Token bulunamadı. Response: {login_resp.text[:300]}")
-    print("✅ Login başarılı, token alındı")
-except Exception as e:
-    raise Exception(f"❌ Login response parse hatası: {e} | Raw: {login_resp.text[:300]}")
-
-# =====================
-# 2️⃣ RAPOR İNDİR
+# 1️⃣ BUBILET → HAM_VERI
 # =====================
 print("📥 Bubilet Excel indiriliyor...")
 
-REPORT_URL = "https://panelapi.bubilet.com.tr/api/reports/company/2677/sales?FileName=Rapor"
+URL = "https://oldpanel.api.bubilet.com.tr/api/reports/company/2677/sales?FileName=Rapor"
 
-report_headers = {
-    **BASE_HEADERS,
-    "Authorization": f"Bearer {token}",
-    "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "Origin": "https://panel.bubilet.com.tr",
-    "Referer": "https://panel.bubilet.com.tr/",
+token = BUBILET_TOKEN.strip()
+if not token.lower().startswith("bearer "):
+    token = f"Bearer {token}"
+
+headers = {
+    "authorization": token,
+    "accept": "application/json",
+    "accept-language": "tr,en-US;q=0.9,en;q=0.8",
+    "cache-control": "no-cache",
+    "content-type": "application/json; charset=utf-8",
+    "origin": "https://panel.bubilet.com.tr",
+    "pragma": "no-cache",
+    "referer": "https://panel.bubilet.com.tr/",
+    "sec-ch-ua": '"Chromium";v="146", "Not-A.Brand";v="24", "Opera";v="130"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"macOS"',
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 OPR/130.0.0.0",
 }
 
 response = None
 for attempt in range(1, 4):
     try:
-        print(f"🔄 Rapor indirme deneme {attempt}/3...")
-        response = session.get(REPORT_URL, headers=report_headers, timeout=30)
+        print(f"🔄 Deneme {attempt}/3...")
+        response = requests.get(URL, headers=headers, timeout=30)
         print(f"   HTTP {response.status_code}")
         if response.status_code == 200:
             print("✅ Rapor indirildi")
             break
         elif response.status_code in (429, 503):
-            wait = attempt * 5
-            print(f"⚠️ Rate limit, {wait}s bekleniyor...")
-            time.sleep(wait)
+            time.sleep(attempt * 5)
         else:
-            print(f"❌ Hata: {response.status_code}")
             time.sleep(attempt * 3)
     except requests.exceptions.RequestException as e:
         print(f"⚠️ Bağlantı hatası: {e}")
@@ -153,7 +105,7 @@ if response is None or response.status_code != 200:
 ham_df = pd.read_excel(io.BytesIO(response.content))
 
 # =====================
-# 3️⃣ Excel indirme saati
+# 2️⃣ Excel indirme saati
 # =====================
 indirme_saati = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
 ham_df.insert(len(ham_df.columns), "Excel_Indirme_Saati", indirme_saati)
@@ -162,20 +114,20 @@ write_df(ws_ham, ham_df)
 print(f"🕒 Excel indirme saati yazıldı: {indirme_saati}")
 
 # =====================
-# 4️⃣ HAM_VERI_2 (şimdilik boş)
+# 3️⃣ HAM_VERI_2 (şimdilik boş)
 # =====================
 if ws_ham2.get_all_values() == []:
     ws_ham2.update([["2. PLATFORM BEKLENIYOR"]])
 
 # =====================
-# 5️⃣ GITHUB RUN FLAG
+# 4️⃣ GITHUB RUN FLAG
 # =====================
 run_id = f"RUN_{int(time.time() * 1000)}"
 ws_panel.update("Z2", [[run_id]])
 print(f"🚩 RUN FLAG yazıldı → PANEL!Z2 = {run_id}")
 
 # =====================
-# 6️⃣ APPS SCRIPT TETİKLE (opsiyonel)
+# 5️⃣ APPS SCRIPT TETİKLE (opsiyonel)
 # =====================
 if APPS_SCRIPT_URL:
     try:
