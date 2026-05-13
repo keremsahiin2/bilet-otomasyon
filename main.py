@@ -14,14 +14,14 @@ print("🚀 Script başladı")
 # =====================
 # ENV
 # =====================
-BUBILET_TOKEN   = os.getenv("BUBILET_TOKEN")   # "Bearer eyJ..." formatında
-SHEET_ID        = os.getenv("SHEET_ID")
-GOOGLE_JSON     = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL")  # opsiyonel
+BUBILET_EMAIL    = os.getenv("BUBILET_EMAIL")
+BUBILET_PASSWORD = os.getenv("BUBILET_PASSWORD")
+SHEET_ID         = os.getenv("SHEET_ID")
+GOOGLE_JSON      = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+APPS_SCRIPT_URL  = os.getenv("APPS_SCRIPT_URL")
 
-if not all([BUBILET_TOKEN, SHEET_ID, GOOGLE_JSON]):
-    raise Exception("❌ ENV eksik: BUBILET_TOKEN, SHEET_ID, GOOGLE_SERVICE_ACCOUNT_JSON gerekli")
-
+if not all([BUBILET_EMAIL, BUBILET_PASSWORD, SHEET_ID, GOOGLE_JSON]):
+    raise Exception("❌ ENV eksik: BUBILET_EMAIL, BUBILET_PASSWORD, SHEET_ID, GOOGLE_SERVICE_ACCOUNT_JSON gerekli")
 print("✅ ENV OK")
 
 # =====================
@@ -52,14 +52,51 @@ def write_df(sheet, df):
     sheet.update([df.columns.tolist()] + df.values.tolist())
 
 # =====================
-# 1️⃣ BUBILET → HAM_VERI
+# 1️⃣ BUBILET LOGIN → TOKEN AL
+# =====================
+print("🔐 Bubilet'e giriş yapılıyor...")
+
+login_url = "https://panelapi.bubilet.com.tr/api/auth/login"
+login_payload = {
+    "email": BUBILET_EMAIL,
+    "password": BUBILET_PASSWORD
+}
+login_headers = {
+    "Content-Type": "application/json",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"
+}
+
+login_resp = requests.post(login_url, json=login_payload, headers=login_headers, timeout=30)
+
+if login_resp.status_code != 200:
+    raise Exception(f"❌ Login başarısız: {login_resp.status_code} → {login_resp.text[:300]}")
+
+login_data = login_resp.json()
+
+# Token'ı response'dan çek (alan adı farklıysa aşağıya yaz)
+token = (
+    login_data.get("token") or
+    login_data.get("accessToken") or
+    login_data.get("access_token") or
+    login_data.get("data", {}).get("token")
+)
+
+if not token:
+    raise Exception(f"❌ Token alınamadı. Login response: {json.dumps(login_data)[:300]}")
+
+BUBILET_TOKEN = f"Bearer {token}"
+print("✅ Token alındı")
+
+# =====================
+# 2️⃣ BUBILET → HAM_VERI
 # =====================
 print("📥 Bubilet Excel indiriliyor...")
 
 url = "https://panelapi.bubilet.com.tr/api/reports/company/2677/sales?FileName=Rapor"
 headers = {
     "Authorization": BUBILET_TOKEN,
-    "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"
 }
 
 response = requests.get(url, headers=headers, timeout=30)
@@ -71,30 +108,29 @@ ham_df = pd.read_excel(io.BytesIO(response.content))
 print(f"✅ Excel indirildi: {len(ham_df)} satır")
 
 # =====================
-# 2️⃣ Excel indirme saati
+# 3️⃣ Excel indirme saati
 # =====================
 indirme_saati = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
 ham_df.insert(len(ham_df.columns), "Excel_Indirme_Saati", indirme_saati)
 ham_df["KAYNAK"] = "BUBILET"
-
 write_df(ws_ham, ham_df)
 print(f"🕒 HAM_VERI yazıldı: {indirme_saati}")
 
 # =====================
-# 3️⃣ HAM_VERI_2 (şimdilik boş)
+# 4️⃣ HAM_VERI_2 (şimdilik boş)
 # =====================
 if ws_ham2.get_all_values() == []:
     ws_ham2.update([["2. PLATFORM BEKLENIYOR"]])
 
 # =====================
-# 4️⃣ GITHUB RUN FLAG
+# 5️⃣ GITHUB RUN FLAG
 # =====================
 run_id = f"RUN_{int(time.time() * 1000)}"
 ws_panel.update("Z2", [[run_id]])
 print(f"🚩 RUN FLAG yazıldı → PANEL!Z2 = {run_id}")
 
 # =====================
-# 5️⃣ APPS SCRIPT TETİKLE (opsiyonel)
+# 6️⃣ APPS SCRIPT TETİKLE (opsiyonel)
 # =====================
 if APPS_SCRIPT_URL:
     try:
