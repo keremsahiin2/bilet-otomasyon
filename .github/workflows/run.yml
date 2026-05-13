@@ -1,12 +1,13 @@
 name: Bilet Otomasyon
 
 on:
-  workflow_dispatch   # 👈 SADECE ELLE RUN
+  workflow_dispatch:   # Elle çalıştır
+  schedule:
+    - cron: "*/30 * * * *"  # Her 30 dakikada otomatik (istersen kapat)
 
 jobs:
   run:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
 
@@ -20,7 +21,8 @@ jobs:
 
       - name: Script çalıştır
         env:
-          BUBILET_TOKEN: ${{ secrets.BUBILET_TOKEN }}
+          BUBILET_EMAIL: ${{ secrets.BUBILET_EMAIL }}
+          BUBILET_PASSWORD: ${{ secrets.BUBILET_PASSWORD }}
           SHEET_ID: ${{ secrets.SHEET_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
