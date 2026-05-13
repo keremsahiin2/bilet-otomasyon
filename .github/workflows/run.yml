@@ -21,7 +21,8 @@ jobs:
 
       - name: Script çalıştır
         env:
-          BUBILET_TOKEN: ${{ secrets.BUBILET_TOKEN }}
+          BUBILET_EMAIL: ${{ secrets.BUBILET_EMAIL }}
+          BUBILET_PASSWORD: ${{ secrets.BUBILET_PASSWORD }}
           SHEET_ID: ${{ secrets.SHEET_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
