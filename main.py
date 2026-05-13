@@ -14,40 +14,15 @@ print("🚀 Script başladı")
 # =====================
 # ENV
 # =====================
-BUBILET_EMAIL    = os.getenv("BUBILET_EMAIL")
-BUBILET_PASSWORD = os.getenv("BUBILET_PASSWORD")
-SHEET_ID         = os.getenv("SHEET_ID")
-GOOGLE_JSON      = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-APPS_SCRIPT_URL  = os.getenv("APPS_SCRIPT_URL")  # opsiyonel
+BUBILET_TOKEN   = os.getenv("BUBILET_TOKEN")   # "Bearer eyJ..." formatında
+SHEET_ID        = os.getenv("SHEET_ID")
+GOOGLE_JSON     = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL")  # opsiyonel
 
-if not all([BUBILET_EMAIL, BUBILET_PASSWORD, SHEET_ID, GOOGLE_JSON]):
-    raise Exception("❌ ENV eksik: BUBILET_EMAIL, BUBILET_PASSWORD, SHEET_ID, GOOGLE_SERVICE_ACCOUNT_JSON gerekli")
+if not all([BUBILET_TOKEN, SHEET_ID, GOOGLE_JSON]):
+    raise Exception("❌ ENV eksik: BUBILET_TOKEN, SHEET_ID, GOOGLE_SERVICE_ACCOUNT_JSON gerekli")
 
 print("✅ ENV OK")
-
-# =====================
-# 🔐 BUBİLET LOGIN → TOKEN
-# =====================
-print("🔐 Bubilet'e login olunuyor...")
-
-login_response = requests.post(
-    "https://panelapi.bubilet.com.tr/api/auth/login",
-    json={"email": BUBILET_EMAIL, "password": BUBILET_PASSWORD},
-    timeout=15
-)
-
-if login_response.status_code != 200:
-    raise Exception(f"❌ Bubilet login başarısız: {login_response.status_code} → {login_response.text}")
-
-login_data = login_response.json()
-access_token = login_data.get("access_token")
-token_type   = login_data.get("token_type", "bearer").capitalize()  # "bearer" → "Bearer"
-
-if not access_token:
-    raise Exception("❌ access_token alınamadı")
-
-BUBILET_TOKEN = f"{token_type} {access_token}"
-print(f"✅ Token alındı (token_type: {token_type})")
 
 # =====================
 # GOOGLE SHEETS
