@@ -1,29 +1,23 @@
 name: Bilet Otomasyon
-
 on:
   workflow_dispatch:   # Elle çalıştır
   schedule:
     - cron: "*/30 * * * *"  # Her 30 dakikada otomatik (istersen kapat)
-
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
       - name: Python kur
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
-
       - name: Paketleri kur
-        run: pip install pandas requests gspread google-auth openpyxl
-
+        run: pip install pandas requests gspread google-auth openpyxl cloudscraper
       - name: Script çalıştır
         env:
           BUBILET_EMAIL: ${{ secrets.BUBILET_EMAIL }}
           BUBILET_PASSWORD: ${{ secrets.BUBILET_PASSWORD }}
-          BUBILET_TOKEN: ${{ secrets.BUBILET_TOKEN }}
           SHEET_ID: ${{ secrets.SHEET_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
